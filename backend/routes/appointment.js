@@ -4,7 +4,7 @@ const Appointment=require('../models/Appointment')
 const auth=require('../middlewares/authmiddleware')
 const User=require('../models/User')
 const Emp=require('../models/Emp')
-const zod=requrie('zod')
+const zod=require('zod')
 
 const createAppointmentSchema = zod.object({
     staff: zod.string(),
@@ -24,7 +24,7 @@ const updateAppointmentSchema = zod.object({
 
 router.post("/user",auth,async(req,res)=>{
     try{
-        const parsed=createAppointmentSchema.safeparse(req.body);
+        const parsed=createAppointmentSchema.safeParse(req.body);
         if(!parsed.success){
             return res.status(400).json({
                 msg:"invalid data"
@@ -43,7 +43,7 @@ router.post("/user",auth,async(req,res)=>{
         const appointment=new Appointment({
             patient:req.user.id,
             staff:data.staff,
-            appointmentdate:data.appointmentdate,
+            appointmentdate: new Date(data.appointmentdate),
             duration:data.duration??30,
             appointmentType:data.appointmentType,
             notes:data.notes,

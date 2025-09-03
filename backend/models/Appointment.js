@@ -1,69 +1,67 @@
+const mongoose = require('mongoose'); 
 const User = require("./User");
 const Emp = require("./Emp");
 
-const mongoose = require('mongoose'); 
-const { date, number, string, maxLength } = require("zod");
-
 const AppointmentSchema = new mongoose.Schema({
-   
     patient: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User', 
         required: true,
     },
-    staff:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:'Emp',
-        require:true,
+    staff: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Emp',
+        required: true,
     },
-    appointmentdate:{
-        type:date,
-        require:true,
+    appointmentdate: {
+        type: Date,
+        required: true,
     },
-    duration:{
-        type:number,
-        required:true,
-        default:30,
+    duration: {
+        type: Number,
+        default: 30,  // default 30 minutes
+        required: true,
     },
-    status:{
+    status: {
         type: String,
-        enum:['scheduled','confirmed','in-progress','completed','canceled'],
-        default:'scheduled',
-        required:true,
+        enum: ['scheduled', 'confirmed', 'in-progress', 'completed', 'canceled'],
+        default: 'scheduled',
+        required: true,
     },
-    appointmentType:{
-        type:String,
-        required:true,
-        enum:['consultation','speech-therapy','hearing-test','followup','emergency'],
+    appointmentType: {
+        type: String,
+        enum: ['consultation', 'speech-therapy', 'hearing-test', 'followup', 'emergency'],
+        required: true,
     },
-    notes:{
+    notes: {
         type: String,
         trim: true,
-        maxLength: 300,
-
+        maxlength: 300,
     },
-    createdAt:{
-        type: Date,
-        default:Date.now,
-    },
-    updatedAt:{
-        type: Date,
-        default:Date.now,
-    },
-    priority:{
-        type:String,
-        enum:['low','normal','high','emergency'],
-        default:'normal',
-    },
-    paymentStatus:{
+    priority: {
         type: String,
-        enum:['pending','paid','partial','waived'],
-        default:'pending',
+        enum: ['low', 'normal', 'high', 'emergency'],
+        default: 'normal',
+    },
+    paymentStatus: {
+        type: String,
+        enum: ['pending', 'paid', 'partial', 'waived'],
+        default: 'pending',
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now,
+    },
+    updatedAt: {
+        type: Date,
+        default: Date.now,
     }
+});
 
-
-},);
-
+// auto update updatedAt before save
+AppointmentSchema.pre('save', function (next) {
+    this.updatedAt = new Date();
+    next();
+});
 
 module.exports = mongoose.model("Appointment", AppointmentSchema);
-
