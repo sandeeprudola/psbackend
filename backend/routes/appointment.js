@@ -22,7 +22,7 @@ const updateAppointmentSchema = zod.object({
     paymentStatus: zod.enum(['pending','paid','partial','waived']).optional()
 });
 
-router.post("/user",auth,async(req,res)=>{
+router.post("/user",auth(),async(req,res)=>{
     try{
         const parsed=createAppointmentSchema.safeParse(req.body);
         if(!parsed.success){
