@@ -55,8 +55,8 @@ router.post("/signup",async(req,res)=>{
 
     await Employee.save();
     const token=jwt.sign({
-        Employeeid:Employee._id,
-        role:Employee.role
+        userId: Employee._id,
+        role: Employee.role
     },JWT_SECRET)
 
     res.status(200).json({message:"Employee created successfully",token})
@@ -98,8 +98,8 @@ const signinSchema=zod.object({
             })
         }
         const token= jwt.sign({
-            Employeeid:Employee._id,
-
+            userId: Employee._id,
+            role: Employee.role
         },JWT_SECRET)
 
         res.status(200).json({

@@ -65,4 +65,32 @@ router.post("/user",auth(),async(req,res)=>{
 
 })
 
+router.get("/ps",auth(),async(req,res)=>{
+
+    try{
+        const employee = await Emp.findById(req.user.id)
+        if(!employee){
+            return res.status(403).json({msg:"no access"})
+        }
+
+        const {status}=req.query;
+        const query= {staff:req.user.id}
+
+        if(status) query.status=status;
+
+        const items=await Appointment.find(query)
+        .populate('patient', 'firstName lastName email role ')
+        .populate('staff','firstName lastName specilization role ')
+        .sort({appointmentdate:1})
+
+        res.json({
+            appointments:items
+        })
+
+    }
+    catch(err){
+        res.status(500).json({msg:"failed to fetch appointments"})
+    }
+})  
+
 module.exports=router;
