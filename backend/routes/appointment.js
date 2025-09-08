@@ -93,4 +93,7 @@ router.get("/ps",auth(),async(req,res)=>{
     }
 })  
 
+router.get("/update",auth(),async(req,res)=>{
+    
+})
 module.exports=router;
