@@ -90,5 +90,50 @@ router.post("/signup",auth,async(req,res)=>{
     }
 })
 
+const adminSigninSchema=zod.object({
+    username:zod.string(),
+    password:zod.string(),
+ })
+
+router.post("/signin",async(req,res)=>{
+    try{
+        const body=req.body
+        const {success}=adminSigninSchema.safeParse(body)
+
+        if(!success){
+            return res.status(401).json({
+                msg:"admin not found"
+            })
+        }
+        const admin=await Admin.findOne({
+            username:body.username
+        })
+
+        if(admin){
+            const isvalid=await bcrypt.compare(body.password,admin.password)
+            if(!isvalid){
+                res.status(401).json({
+                    msg:"wrong credentials"
+                })
+            }
+            const token= jwt.sign({
+                userid:admin._id,
+                role:admin.role
+            },JWT_SECRET)
+
+            res.status(200).json({
+                msg:"signin success",
+                token
+            })
+        }
+    }
+    catch(err){
+            res.status(500).json({
+                msg:"error in try code"
+            })
+    }
+
+})
+
 
 module.exports=router;
