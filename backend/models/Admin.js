@@ -13,7 +13,6 @@ const AdminSchema=new mongoose.Schema({
     password:{
         type:String,
         required:true,
-        maxLength:30,
         minLength:8,
     },
     firstName:{
@@ -38,7 +37,6 @@ const AdminSchema=new mongoose.Schema({
         type: String,
         enum:["super-admin","admin"],
         default:"admin",
-        required:true,
     },
     caninvite:{
         type: Boolean,

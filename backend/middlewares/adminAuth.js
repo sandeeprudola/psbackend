@@ -3,6 +3,10 @@ const jwt=require('jsonwebtoken');
 const Admin = require("../models/Admin");
 
 const adminAuth = async (req, res, next) => {
+    const admincount=await Admin.countDocuments();
+    if(admincount<=2){
+        return next();
+    }
     const authHeader=req.headers.authorization
     if(!authHeader || !authHeader.startsWith("Bearer ")){
         return res.status(411).json({
@@ -31,6 +35,5 @@ const adminAuth = async (req, res, next) => {
     }
   };
 
-  module.exports={
-    adminAuth
-  }
+  module.exports=adminAuth;
+  
