@@ -1,11 +1,15 @@
 const express=require('express')
 const Admin=require("../models/Admin")
+const User=require("../models/User")
+const Emp=require("../models/Emp")
+const Appointment=require("../models/Appointment")
 const router=express.Router();
 const auth=require("../middlewares/adminAuth")
 const zod=require('zod')
 const bcrypt=require('bcryptjs');
 const { JWT_SECRET } = require('../config');
-const jwt=require('jsonwebtoken')
+const jwt=require('jsonwebtoken');
+const adminAuth = require('../middlewares/adminAuth');
 
 const adminSchema=zod.object({
     username:zod.string(),
@@ -133,6 +137,52 @@ router.post("/signin",async(req,res)=>{
             })
     }
 
+})
+
+//dashboard and analytics route 
+
+router.get("/dashboard",adminAuth,async(req,res)=>{
+    try{    
+        const [totalUsers,totalEmp,totalAdmins,totalAppointments]=await Promise.all([
+            User.countDocuments(),
+            Emp.countDocuments(),
+            Appointment.countDocuments(),
+            Admin.countDocuments(),
+
+
+    ])
+    const startOfToday=new Date();
+    startOfToday.setHours(0,0,0,0);
+    const endOfToday=new Date();
+    endOfToday.setHours(23,59,59,999);
+
+    const [todayAppointments,pendingPayments,scheduledToday]=await Promise.all([
+        Appointment.countDocuments({
+            appointmentdate:{$gte:startOfToday,$lte:endOfToday}
+        }),
+        Appointment.countDocuments({paymentStatus:"pending"}),
+        Appointment.find({
+            appointmentdate:{$gte:startOfToday,$lte:endOfToday}
+        }).select("patient staff appointmentdate status").populate("patient","firstName lastName ").populate("staff","firstName lastName specialization")
+    ])
+
+    return res.json({
+        summary:{
+            totalUsers,
+            totalEmp,
+            totalAdmins,
+            totalAppointments,
+            todayAppointments,
+            pendingPayments
+        },
+        todaySchedule: scheduledToday
+    });
+    }
+    catch(err){
+        res.status(500).json({
+            msg:"failed to load dashboard"
+        })
+    }
 })
 
 
