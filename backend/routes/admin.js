@@ -10,6 +10,7 @@ const bcrypt=require('bcryptjs');
 const { JWT_SECRET } = require('../config');
 const jwt=require('jsonwebtoken');
 const adminAuth = require('../middlewares/adminAuth');
+const { date } = require('zod/mini')
 
 const adminSchema=zod.object({
     username:zod.string(),
@@ -185,5 +186,91 @@ router.get("/dashboard",adminAuth,async(req,res)=>{
     }
 })
 
+// GET /api/v1/admin/stats?from=2025-09-01&to=2025-09-30
+router.get("/stats", auth, async (req, res) => {
+	try {
+		const Appointment = require("../models/Appointment");
+		const Emp = require("../models/Emp");
+
+		const from = req.query.from ? new Date(req.query.from) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+		const to = req.query.to ? new Date(req.query.to) : new Date();
+		to.setHours(23,59,59,999);
+
+		// Status breakdown
+		const statusAgg = await Appointment.aggregate([
+			{ $match: { appointmentdate: { $gte: from, $lte: to } } },
+			{ $group: { _id: "$status", count: { $sum: 1 } } },
+			{ $project: { _id: 0, status: "$_id", count: 1 } }
+		]);
+
+		// Type breakdown
+		const typeAgg = await Appointment.aggregate([
+			{ $match: { appointmentdate: { $gte: from, $lte: to } } },
+			{ $group: { _id: "$appointmentType", count: { $sum: 1 } } },
+			{ $project: { _id: 0, type: "$_id", count: 1 } }
+		]);
+
+		// Daily counts
+		const dailyAgg = await Appointment.aggregate([
+            { $match: { appointmentdate: { $gte: from, $lte: to } } },
+            {
+                $group: {
+                    _id: {
+                        y: { $year: "$appointmentdate" },
+                        m: { $month: "$appointmentdate" },
+                        d: { $dayOfMonth: "$appointmentdate" }
+                    },
+                    count: { $sum: 1 }
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    date: { $dateFromParts: { year: "$_id.y", month: "$_id.m", day: "$_id.d" } },
+                    count: 1
+                }
+            },
+            { $sort: { date: 1 } }
+        ]);
+
+		// Top staff by appointment count
+		const topStaffAgg = await Appointment.aggregate([
+			{ $match: { appointmentdate: { $gte: from, $lte: to } } },
+			{ $group: { _id: "$staff", count: { $sum: 1 } } },
+			{ $sort: { count: -1 } },
+			{ $limit: 5 }
+		]);
+
+		// Enrich top staff details
+		const staffIds = topStaffAgg.map(s => s._id);
+		const staffDocs = await Emp.find({ _id: { $in: staffIds } }).select("firstName lastName role specialization");
+		const staffMap = new Map(staffDocs.map(s => [s._id.toString(), s]));
+		const topStaff = topStaffAgg.map(s => ({
+			staffId: s._id,
+			name: staffMap.get(String(s._id)) ? `${staffMap.get(String(s._id)).firstName} ${staffMap.get(String(s._id)).lastName}` : "Unknown",
+			role: staffMap.get(String(s._id))?.role,
+			specialization: staffMap.get(String(s._id))?.specialization,
+			count: s.count
+		}));
+
+		// Payment breakdown
+		const paymentAgg = await Appointment.aggregate([
+			{ $match: { appointmentdate: { $gte: from, $lte: to } } },
+			{ $group: { _id: "$paymentStatus", count: { $sum: 1 } } },
+			{ $project: { _id: 0, paymentStatus: "$_id", count: 1 } }
+		]);
+
+		return res.json({
+			range: { from, to },
+			status: statusAgg,
+			types: typeAgg,
+			daily: dailyAgg,
+			topStaff,
+			payments: paymentAgg
+		});
+	} catch (err) {
+		return res.status(500).json({ msg: "Failed to load stats", error: err.message });
+	}
+});
 
 module.exports=router;
