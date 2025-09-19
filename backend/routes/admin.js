@@ -22,6 +22,18 @@ const adminSchema=zod.object({
     caninvite: zod.boolean().optional()
 })
 
+function parsePagination(req){
+    const page=Math.max(parseInt(req.query.page || "1",10),1);
+    const limit=Math.min(Math.max(parseInt(req.query.limit || "1",10),1),100)
+    return {page,limit,skip:(page-1)*limit};
+}
+function parseDateRange(req){
+    const from= req.query.from ? new Date(req.query.from):undefined;
+    const to=req.query.to ? new Date(req.query.to):undefined;
+    if(to)to.setHours(23,59,59,999);
+    return {from,to};
+}
+
 router.post("/signup",auth,async(req,res)=>{
     try{
         const {username,password,firstName,lastName,email,role,caninvite}=req.body;
@@ -186,7 +198,7 @@ router.get("/dashboard",adminAuth,async(req,res)=>{
     }
 })
 
-// GET /api/v1/admin/stats?from=2025-09-01&to=2025-09-30
+//stats from preferred date 
 router.get("/stats", auth, async (req, res) => {
 	try {
 		const Appointment = require("../models/Appointment");
@@ -272,5 +284,34 @@ router.get("/stats", auth, async (req, res) => {
 		return res.status(500).json({ msg: "Failed to load stats", error: err.message });
 	}
 });
+
+//user essential routes
+router.get("/users",adminAuth,async(req,res)=>{
+    try{
+        const{page,limit,skip}=parsePagination(req);
+        const {role,q}=req.query;
+
+        const query={};
+        if(role)query.role=role;
+        if(q){
+            query.$or=[
+                {firstName:{$regex:q,$options:"i"}},
+                {lastName:{$regex:q,$options:"i"}},
+                {email:{$regex:q,$options:"i"}},
+                {username:{$regex:q,$options:"i"}}
+            ];
+        }
+        const [items,total]=await Promise.all([
+            User.find(query).sort({createdAt:-1}).skip(skip).limit(limit).select("-password"),
+            User.countDocuments(query)
+        ]);
+        res.json({page,limit,total,items})
+    }
+    catch(err){
+        return res.status(500).json({
+            msg:"failed to fetch users"
+        })
+    }
+})
 
 module.exports=router;
