@@ -11,6 +11,7 @@ const { JWT_SECRET } = require('../config');
 const jwt=require('jsonwebtoken');
 const adminAuth = require('../middlewares/adminAuth');
 const { date } = require('zod/mini')
+const { parse } = require('dotenv')
 
 const adminSchema=zod.object({
     username:zod.string(),
@@ -24,7 +25,7 @@ const adminSchema=zod.object({
 
 function parsePagination(req){
     const page=Math.max(parseInt(req.query.page || "1",10),1);
-    const limit=Math.min(Math.max(parseInt(req.query.limit || "1",10),1),100)
+    const limit=Math.min(Math.max(parseInt(req.query.limit || "4",10),1),100)
     return {page,limit,skip:(page-1)*limit};
 }
 function parseDateRange(req){
@@ -201,8 +202,7 @@ router.get("/dashboard",adminAuth,async(req,res)=>{
 //stats from preferred date 
 router.get("/stats", auth, async (req, res) => {
 	try {
-		const Appointment = require("../models/Appointment");
-		const Emp = require("../models/Emp");
+		
 
 		const from = req.query.from ? new Date(req.query.from) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 		const to = req.query.to ? new Date(req.query.to) : new Date();
@@ -285,7 +285,9 @@ router.get("/stats", auth, async (req, res) => {
 	}
 });
 
-//user essential routes
+//User Essential Routes->
+
+//get all users 
 router.get("/users",adminAuth,async(req,res)=>{
     try{
         const{page,limit,skip}=parsePagination(req);
@@ -313,5 +315,71 @@ router.get("/users",adminAuth,async(req,res)=>{
         })
     }
 })
+
+//update users by their id's as query params
+router.put("/users/:id",adminAuth,async(req,res)=>{
+    try{
+        const allowed = (({firstName, lastName,role})=>({firstName, lastName,role}))(req.body || {});
+        const updated=await User.findByIdAndUpdate(req.params.id,{$set:allowed},{new:true,runValidators:true}).select("-password");
+        if(!updated){
+            return res.status(411).json({
+                msg:"user not found"
+            })
+        }
+        res.json({
+            msg:"user updated"
+        })
+    }
+    catch(err){
+        return res.status(500).json({
+            msg:"failed to update user"
+        })
+    }
+})
+
+//Staff Management Routes->
+router.get("/staff",adminAuth,async(req,res)=>{
+    try{
+        const {page,limit,skip}=parsePagination(req);
+        const {role,active,q}=req.query;
+
+        const query={};
+        if(role)query.role=role;
+        if(active=="true" || active=="false")query.isActive=active==="true";
+        if(q){
+            query.$or=[
+                {firstName:{$regex:q,$options:"i"}},
+                {lastName:{$regex:q,$options:"i"}},
+                {email:{$regex:q,$options:"i"}},
+                {username:{$regex:q,$options:"i"}},
+                {specialization:{$regex:q,$options:"i"}}
+
+            ]
+        }
+        const[items,total]=await Promise.all([
+            Emp.find(query).sort({createdAt:-1}).skip(skip).limit(limit).select("-password"),
+            Emp.countDocuments(query)
+        ])
+        res.json({page,limit,total,items});
+    }
+        catch(err){
+        res.status(500).json({msg:"Failed to fetch staff"});
+    }
+})
+
+router.put("/staff/:id",adminAuth,async(req,res)=>{
+    try{
+        const allowed=(({firstName,lastName,phone, specialization,role,isActive})=>({firstName,lastName,phone,specialization,role,isActive}))(req.body ||{});
+        const updated=await Emp.findByIdAndUpdate(req.params.id,{$set:allowed},{new:true},{runValidators:true}).select("-password")
+        if(!updated)return res.status(411).json({msg:"staff not found"})
+        res.json({
+            msg:"staff updated"})    
+    }
+    catch(err){
+        res.status(500).json({msg:"failed to update staff"})
+    }
+})
+
+//Appointment Management Routes->
 
 module.exports=router;
