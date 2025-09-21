@@ -200,7 +200,7 @@ router.get("/dashboard",adminAuth,async(req,res)=>{
 })
 
 //stats from preferred date 
-router.get("/stats", auth, async (req, res) => {
+router.get("/stats", adminAuth, async (req, res) => {
 	try {
 		
 
@@ -382,4 +382,61 @@ router.put("/staff/:id",adminAuth,async(req,res)=>{
 
 //Appointment Management Routes->
 
+//Get all appointments from this to this...
+
+router.get("/appointments",adminAuth,async(req,res)=>{
+    try{
+        const {page,limit,skip}=parsePagination(req);
+        const {status,staff,user}=req.query;
+        const{from , to}=parseDateRange(req);
+
+        const query={};
+        if(status)query.status=status;
+        if(staff)query.staff=staff;
+        if(user)query.patient=user;
+        if(from || to)query.appointmentdate=Object.assign({},from && {$gte:from}, to &&{$lte:to});
+
+        const [items,total]=await Promise.all([
+            Appointment.find(query)
+            .sort({appointmentdate:-1})
+            .skip(skip).limit(limit)
+            .populate("patient","firstName lastName email role")
+            .populate("staff","firstName lastName role specialization"),
+            Appointment.countDocuments(query)
+        ]);
+        res.json({page,limit,total,items})
+    }
+    catch(err){
+        return res.status(500).json({
+            msg:"Failed to fetch appointments"
+        })
+    }
+})
+
+// Update Appointments
+
+router.put("/appointments/:id",adminAuth,async(req,res)=>{
+    try{
+        const allowed=(({appointmentdate,status,duration,priority,appointmentType,notes,paymentStatus})=>{
+            ({appointmentdate,status,duration,priority,appointmentType,notes,paymentStatus})})(req.body||{});
+            if(allowed.appointmentdate)allowed.appointmentdate=new Date(allowed.appointmentdate);
+            
+            const updated=await Appointment.findByIdAndUpdate(req.params.id,{$set:allowed},{new:true,runValidators:true})
+            .populate("patient","firstName lastName email role")
+            .populate("staff","firstName lastName role specialization")
+
+            if(!updated)return res.status(411).json({
+                msg:"failed to find appointment"
+            })
+
+            res.json({
+                msg:"appointment updated successfully"
+            })
+    }
+    catch(err){
+        return res.status(500).json({
+            msg:"failed to update appointments"
+        })
+    }
+})
 module.exports=router;
